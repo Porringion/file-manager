@@ -28,6 +28,21 @@ public class CustomTableModel implements TableModel {
         return fileList.get(rowIndex);
     }
 
+    public int getRowIndexByItem(FileInfo item){
+
+        int counter = 0;
+
+        for (FileInfo file: fileList) {
+
+            if(file.getFilePath().equals(item.getFilePath()))
+                return counter;
+
+            counter++;
+        }
+
+        return -1;
+    }
+
     public int getRowCount() {
         return fileList.size();
     }

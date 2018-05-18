@@ -1,4 +1,5 @@
 import GUIClasses.TableClasses.CustomTableModel;
+import GUIClasses.TableClasses.DirInfo;
 import GUIClasses.TableClasses.FileInfo;
 
 import javax.swing.*;
@@ -25,21 +26,33 @@ public class MainForm extends JFrame {
     private int lastIndex = 0;
     private File curDir;
 
+    //Стек содержит путь по которому идет программа
+    private Stack<DirInfo> firstFilePath;
+    private Stack<DirInfo> secondFilePath;
+
+
     private MainForm() {
 
+        //Отображаю форму на панели
         setContentPane(mainFromPanel);
         setVisible(true);
         pack();
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
+
+
+        //Обработка выбора диска в чек боксе
         firstDiskList.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
 
                 File fileDisk = (File) firstDiskList.getSelectedItem();
 
-                if(fileDisk == null)
+                if(fileDisk == null || !fileDisk.exists())
                     return;
 
+                //Помещаем файл диска в стэк
+                firstFilePath.clear();
+                firstFilePath.push(new DirInfo(fileDisk, true));
                 firstFileTable.setModel(new CustomTableModel(fileDisk));
             }
         });
@@ -52,9 +65,12 @@ public class MainForm extends JFrame {
                 if(fileDisk == null)
                     return;
 
+                secondFilePath.clear();
+                secondFilePath.push(new DirInfo(fileDisk, true));
                 secondFileTable.setModel(new CustomTableModel(fileDisk));
             }
         });
+
         firstFileTable.addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
@@ -62,45 +78,47 @@ public class MainForm extends JFrame {
 
                 int index = firstFileTable.getSelectedRow();
 
-                if(index < 0 && e.getKeyCode() != 8)
-                    return;
-
-                if(e.getKeyCode() == 10){
-
-                    lastIndex = index;
-
-                    FileInfo item = getFileInfoByIndexFromTableModel((CustomTableModel) firstFileTable.getModel(), index);
-
-                    if(item.getType().equals(FileInfo.TYPE_DIR)) {
-
-                        File selectedDir = new File(item.getFilePath());
-
-                        if (selectedDir.exists())
-                            curDir = selectedDir;
-                            firstFileTable.setModel(new CustomTableModel(curDir));
-                        }
+                if(index > -1 && e.getKeyCode() == 10){
+                    onEnter(index, firstFilePath, firstFileTable);
                 }
-
                 else if(e.getKeyCode() == 8){
-
-                    File parentFile = curDir.getParentFile();
-
-                    if(parentFile.exists()) {
-
-                        firstFileTable.setModel(new CustomTableModel(parentFile));
-
-                        int rowCount = firstFileTable.getModel().getRowCount()-1;
-
-                        if(rowCount > lastIndex)
-                            firstFileTable.setRowSelectionInterval(lastIndex, lastIndex);
-                        else
-                            firstFileTable.setRowSelectionInterval(rowCount, rowCount);
-
-                        curDir = parentFile;
-                    }
+                    onBackspace(firstFilePath, firstFileTable);
                 }
+
             }
         });
+
+    }
+
+    private void onBackspace(Stack<DirInfo> filePath, JTable table){
+        DirInfo lastDir = filePath.peek();
+
+        if(lastDir.getIsRoot())
+            return;
+
+        filePath.pop();
+
+        DirInfo curDir = filePath.peek();
+
+        CustomTableModel tableModel = new CustomTableModel(curDir.getDirectory());
+
+        table.setModel(tableModel);
+
+        int index = tableModel.getRowIndexByItem(lastDir.getFileInfoDirectory());
+
+        table.setRowSelectionInterval(index, index);
+
+    }
+
+    private void onEnter(int index, Stack<DirInfo> filePath, JTable table){
+        FileInfo item = getFileInfoByIndexFromTableModel((CustomTableModel) table.getModel(), index);
+
+        if(item.getType().equals(FileInfo.TYPE_DIR)){
+
+            File curDir = new File(item.getFilePath());
+            filePath.push(new DirInfo(curDir, false));
+            table.setModel(new CustomTableModel(curDir));
+        }
     }
 
 
@@ -111,19 +129,34 @@ public class MainForm extends JFrame {
     private void createUIComponents() {
 //        // TODO: place custom component creation code here
 
-        File[] listRoots = File.listRoots();
+        firstFilePath = new Stack<DirInfo>();
+        secondFilePath = new Stack<DirInfo>();
 
-        firstDiskList = new JComboBox(listRoots);
-        secondDiscList = new JComboBox(listRoots);
+        File[] rootList = File.listRoots();
+
+        firstDiskList = new JComboBox(rootList);
+        secondDiscList = new JComboBox(rootList);
+
+        File curDisk;
 
         if(firstDiskList.getSelectedItem() != null){
-            firstFileTable = new JTable(new CustomTableModel((File) firstDiskList.getSelectedItem()));
+
+            curDisk = (File) firstDiskList.getSelectedItem();
+
+            firstFileTable = new JTable(new CustomTableModel(curDisk));
             firstFileTable.setVisible(true);
+
+            firstFilePath.push(new DirInfo(curDisk, true));
         }
 
         if(secondDiscList.getSelectedItem() != null){
-            secondFileTable = new JTable(new CustomTableModel((File) secondDiscList.getSelectedItem()));
+
+            curDisk = (File) secondDiscList.getSelectedItem();
+
+            secondFileTable = new JTable(new CustomTableModel(curDisk));
             secondFileTable.setVisible(true);
+
+            secondFilePath.push(new DirInfo(curDisk, true));
         }
 
     }
