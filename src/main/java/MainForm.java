@@ -1,16 +1,17 @@
+import GUIClasses.TableClasses.ActionsDialog;
 import GUIClasses.TableClasses.CustomTableModel;
 import GUIClasses.TableClasses.DirInfo;
 import GUIClasses.TableClasses.FileInfo;
+import com.sun.jna.platform.FileUtils;
 
 import javax.swing.*;
-import javax.swing.table.JTableHeader;
-import javax.swing.table.TableColumn;
-import javax.swing.table.TableModel;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.io.File;
+import java.io.IOException;
 import java.util.*;
 
 public class MainForm extends JFrame {
@@ -23,15 +24,87 @@ public class MainForm extends JFrame {
     private JTable secondFileTable;
     private JScrollPane firstFileTableContainer;
     private JTable firstFileTable;
-    private int lastIndex = 0;
-    private File curDir;
+
+    private Desktop desktop;
 
     //Стек содержит путь по которому идет программа
     private Stack<DirInfo> firstFilePath;
     private Stack<DirInfo> secondFilePath;
 
+    private KeyAdapter tableAdapter = null;
+    private ActionListener comboboxActionListener = null;
+
+
+
+    private void initListeners(){
+
+        tableAdapter = new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                super.keyPressed(e);
+
+                JTable table = (JTable) e.getSource();
+                Stack<DirInfo> dirInfoStack;
+
+                if(table.getName().equals("firstFileTable"))
+                    dirInfoStack = firstFilePath;
+                else
+                    dirInfoStack = secondFilePath;
+
+                int index = table.getSelectedRow();
+
+
+                if(index > -1 && e.getKeyCode() == 10){
+                    onEnter(index, dirInfoStack, table);
+                }
+                else if(e.getKeyCode() == 8){
+                    onBackspace(dirInfoStack, table);
+                }
+                else if(e.getKeyCode() == 127 || e.getKeyCode() == 119){
+                    onDeleteFile(table);
+                }
+            }
+        };
+
+        comboboxActionListener = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+
+                JComboBox comboBox = (JComboBox) e.getSource();
+                JTable table;
+                Stack<DirInfo> dirInfoStack;
+
+                if(comboBox.getName().equals("firstDiskList")){
+                    table = firstFileTable;
+                    dirInfoStack = firstFilePath;
+                }
+                else {
+                    table = secondFileTable;
+                    dirInfoStack = secondFilePath;
+                }
+
+                File fileDisk = (File) comboBox.getSelectedItem();
+
+                if(fileDisk == null || !fileDisk.exists())
+                    return;
+
+                //Помещаем файл диска в стэк
+                dirInfoStack.clear();
+                dirInfoStack.push(new DirInfo(fileDisk, true));
+                table.setModel(new CustomTableModel(fileDisk));
+            }
+        };
+
+    }
 
     private MainForm() {
+
+        firstFileTable.setName("firstFileTable");
+        secondFileTable.setName("secondFileTable");
+        firstDiskList.setName("firstDiskList");
+        secondDiscList.setName("secondDiskList");
+
+        desktop = Desktop.getDesktop();
 
         //Отображаю форму на панели
         setContentPane(mainFromPanel);
@@ -39,54 +112,21 @@ public class MainForm extends JFrame {
         pack();
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
+        initListeners();
 
+        firstDiskList.addActionListener(comboboxActionListener);
+        secondDiscList.addActionListener(comboboxActionListener);
 
-        //Обработка выбора диска в чек боксе
-        firstDiskList.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
+        firstFileTable.addKeyListener(tableAdapter);
+        secondFileTable.addKeyListener(tableAdapter);
 
-                File fileDisk = (File) firstDiskList.getSelectedItem();
+    }
 
-                if(fileDisk == null || !fileDisk.exists())
-                    return;
+    private void onDeleteFile(JTable table){
 
-                //Помещаем файл диска в стэк
-                firstFilePath.clear();
-                firstFilePath.push(new DirInfo(fileDisk, true));
-                firstFileTable.setModel(new CustomTableModel(fileDisk));
-            }
-        });
+        table.getSelectedRow();
 
-        secondDiscList.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-
-                File fileDisk = (File) secondDiscList.getSelectedItem();
-
-                if(fileDisk == null)
-                    return;
-
-                secondFilePath.clear();
-                secondFilePath.push(new DirInfo(fileDisk, true));
-                secondFileTable.setModel(new CustomTableModel(fileDisk));
-            }
-        });
-
-        firstFileTable.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent e) {
-                super.keyPressed(e);
-
-                int index = firstFileTable.getSelectedRow();
-
-                if(index > -1 && e.getKeyCode() == 10){
-                    onEnter(index, firstFilePath, firstFileTable);
-                }
-                else if(e.getKeyCode() == 8){
-                    onBackspace(firstFilePath, firstFileTable);
-                }
-
-            }
-        });
+        new ActionsDialog(getArrFilePath(table, table.getSelectedRows()));
 
     }
 
@@ -118,6 +158,16 @@ public class MainForm extends JFrame {
             File curDir = new File(item.getFilePath());
             filePath.push(new DirInfo(curDir, false));
             table.setModel(new CustomTableModel(curDir));
+        }
+        else if(item.getType().equals(FileInfo.TYPE_FILE)){
+
+            try {
+                Desktop.getDesktop().open(new File(item.getFilePath()));
+            } catch (IOException e) {
+                //Обработка не могу открыть файл
+                e.printStackTrace();
+            }
+
         }
     }
 
@@ -159,6 +209,22 @@ public class MainForm extends JFrame {
             secondFilePath.push(new DirInfo(curDisk, true));
         }
 
+    }
+
+    private String[] getArrFilePath(JTable table, int[] arrIndex){
+
+        CustomTableModel tableModel = (CustomTableModel) table.getModel();
+
+        String[] arrPath = new String[arrIndex.length];
+        int counter = 0;
+
+        for (int index:arrIndex) {
+
+            arrPath[counter] = getFileInfoByIndexFromTableModel(tableModel, index).getFilePath();
+            counter++;
+        }
+
+        return arrPath;
     }
 
     private FileInfo getFileInfoByIndexFromTableModel(CustomTableModel tableModel, int rowIndex){
