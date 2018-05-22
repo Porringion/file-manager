@@ -1,15 +1,9 @@
-import GUIClasses.TableClasses.ActionsDialog;
-import GUIClasses.TableClasses.CustomTableModel;
-import GUIClasses.TableClasses.DirInfo;
-import GUIClasses.TableClasses.FileInfo;
-import com.sun.jna.platform.FileUtils;
+import GUIClasses.TableClasses.*;
 
 import javax.swing.*;
+import javax.swing.event.ListSelectionListener;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
+import java.awt.event.*;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
@@ -24,8 +18,7 @@ public class MainForm extends JFrame {
     private JTable secondFileTable;
     private JScrollPane firstFileTableContainer;
     private JTable firstFileTable;
-
-    private Desktop desktop;
+    private JScrollPane secondFileTableContainer;
 
     //Стек содержит путь по которому идет программа
     private Stack<DirInfo> firstFilePath;
@@ -33,8 +26,32 @@ public class MainForm extends JFrame {
 
     private KeyAdapter tableAdapter = null;
     private ActionListener comboboxActionListener = null;
+    private MouseAdapter tableMouseAdapter;
 
+    private int firstTablePosition, secondTablePosition;
 
+    private final String FIRST_TABLE_NAME = "firstFileTable";
+    private final String SECOND_TABLE_NAME = "secondFileTable";
+
+    private final String FIRST_COMBOBOX_NAME = "firstDiskList";
+    private final String SECOND_COMBOBOX_NAME = "secondDiskList";
+
+    private void refreshTableGUI(JTable table, int index, Stack<DirInfo> dirInfoStack, boolean createFile){
+
+        table.setModel(new CustomTableModel(dirInfoStack.peek().getDirectory()));
+
+        if(createFile)
+            return;
+
+        int curFocusIndex = 0;
+
+        if(table.getRowCount() < index)
+            curFocusIndex = table.getRowCount()-1;
+        else
+            curFocusIndex = index-1;
+
+        table.setRowSelectionInterval(curFocusIndex, curFocusIndex);
+    }
 
     private void initListeners(){
 
@@ -46,13 +63,18 @@ public class MainForm extends JFrame {
                 JTable table = (JTable) e.getSource();
                 Stack<DirInfo> dirInfoStack;
 
-                if(table.getName().equals("firstFileTable"))
-                    dirInfoStack = firstFilePath;
-                else
-                    dirInfoStack = secondFilePath;
-
                 int index = table.getSelectedRow();
 
+                setTablePositionByTableName(table.getName(), index);
+
+                if(table.getName().equals(FIRST_TABLE_NAME)){
+                    dirInfoStack = firstFilePath;
+                    firstTablePosition = index;
+                }
+                else {
+                    dirInfoStack = secondFilePath;
+                    secondTablePosition = index;
+                }
 
                 if(index > -1 && e.getKeyCode() == 10){
                     onEnter(index, dirInfoStack, table);
@@ -62,6 +84,32 @@ public class MainForm extends JFrame {
                 }
                 else if(e.getKeyCode() == 127 || e.getKeyCode() == 119){
                     onDeleteFile(table);
+                    refreshTableGUI(table, index, dirInfoStack, false);
+                }
+                else if(e.getKeyCode() == 118){
+                    //Создаю директорию
+                    onCreateFile(dirInfoStack.peek().getDirectory().getAbsolutePath(), true);
+                    refreshTableGUI(table, index, dirInfoStack, true);
+                }
+                else if( e.getKeyCode() == 117){
+//                    Создаю файл
+                    onCreateFile(dirInfoStack.peek().getDirectory().getAbsolutePath(), false);
+                    refreshTableGUI(table, index, dirInfoStack, true);
+                }
+                else if (e.getKeyCode() == 9){
+
+                    table.clearSelection();
+
+                    if(table.getName().equals(FIRST_TABLE_NAME)){
+                        secondFileTable.grabFocus();
+                        table.clearSelection();
+                        secondFileTable.setRowSelectionInterval(secondTablePosition, secondTablePosition);
+                    }
+                    else {
+                        firstFileTable.grabFocus();
+                        table.getSelectionModel().clearSelection();
+                        firstFileTable.setRowSelectionInterval(firstTablePosition, firstTablePosition);
+                    }
                 }
             }
         };
@@ -74,13 +122,15 @@ public class MainForm extends JFrame {
                 JTable table;
                 Stack<DirInfo> dirInfoStack;
 
-                if(comboBox.getName().equals("firstDiskList")){
+                if(comboBox.getName().equals(FIRST_COMBOBOX_NAME)){
                     table = firstFileTable;
                     dirInfoStack = firstFilePath;
+                    firstTablePosition = 0;
                 }
                 else {
                     table = secondFileTable;
                     dirInfoStack = secondFilePath;
+                    secondTablePosition = 0;
                 }
 
                 File fileDisk = (File) comboBox.getSelectedItem();
@@ -95,24 +145,46 @@ public class MainForm extends JFrame {
             }
         };
 
+        tableMouseAdapter = new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                super.mousePressed(e);
+
+                JTable table = (JTable) e.getSource();
+
+                setTablePositionByTableName(table.getName(), table.getSelectedRow());
+
+                if (table.getName().equals(FIRST_TABLE_NAME)){
+                    secondFileTable.clearSelection();
+                }
+                else
+                    firstFileTable.clearSelection();
+
+                if(e.getClickCount() > 1){
+                    boolean f = true;
+                }
+
+            }
+        };
+
     }
 
-    private MainForm() {
+    private void setTablePositionByTableName(String tableName, int index){
 
-        firstFileTable.setName("firstFileTable");
-        secondFileTable.setName("secondFileTable");
-        firstDiskList.setName("firstDiskList");
-        secondDiscList.setName("secondDiskList");
+        if(tableName.equals(FIRST_TABLE_NAME))
+            firstTablePosition = index;
+        else
+            secondTablePosition = index;
+    }
 
-        desktop = Desktop.getDesktop();
+    private void initComponentsSettings(){
+        firstFileTable.setName(FIRST_TABLE_NAME);
+        secondFileTable.setName(SECOND_TABLE_NAME);
+        firstDiskList.setName(FIRST_COMBOBOX_NAME);
+        secondDiscList.setName(SECOND_COMBOBOX_NAME);
 
-        //Отображаю форму на панели
-        setContentPane(mainFromPanel);
-        setVisible(true);
-        pack();
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
-        initListeners();
+        firstFileTable.getColumnModel().setSelectionModel(new CustomCollumnSelectionModel());
+        secondFileTable.getColumnModel().setSelectionModel(new CustomCollumnSelectionModel());
 
         firstDiskList.addActionListener(comboboxActionListener);
         secondDiscList.addActionListener(comboboxActionListener);
@@ -120,14 +192,32 @@ public class MainForm extends JFrame {
         firstFileTable.addKeyListener(tableAdapter);
         secondFileTable.addKeyListener(tableAdapter);
 
+        firstFileTable.addMouseListener(tableMouseAdapter);
+        secondFileTable.addMouseListener(tableMouseAdapter);
+    }
+
+    private MainForm() {
+
+        initListeners();
+
+        initComponentsSettings();
+
+        //Отображаю форму на панели
+        setContentPane(mainFromPanel);
+        setVisible(true);
+        pack();
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    }
+
+    private void onCreateFile(String curDir, boolean isDir){
+        new CreateFileDialog(curDir, isDir);
     }
 
     private void onDeleteFile(JTable table){
 
         table.getSelectedRow();
 
-        new ActionsDialog(getArrFilePath(table, table.getSelectedRows()));
-
+        new DeleteFileDialog(getArrFilePath(table, table.getSelectedRows()));
     }
 
     private void onBackspace(Stack<DirInfo> filePath, JTable table){
@@ -148,6 +238,7 @@ public class MainForm extends JFrame {
 
         table.setRowSelectionInterval(index, index);
 
+        setTablePositionByTableName(table.getName(), index);
     }
 
     private void onEnter(int index, Stack<DirInfo> filePath, JTable table){
@@ -158,6 +249,8 @@ public class MainForm extends JFrame {
             File curDir = new File(item.getFilePath());
             filePath.push(new DirInfo(curDir, false));
             table.setModel(new CustomTableModel(curDir));
+
+            setTablePositionByTableName(table.getName(), 0);
         }
         else if(item.getType().equals(FileInfo.TYPE_FILE)){
 
@@ -170,6 +263,8 @@ public class MainForm extends JFrame {
 
         }
     }
+
+
 
 
     public static void main(String[] args) {
