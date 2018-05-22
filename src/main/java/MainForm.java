@@ -1,10 +1,12 @@
 import GUIClasses.TableClasses.*;
+import com.sun.jna.platform.FileUtils;
 
 import javax.swing.*;
 import javax.swing.event.ListSelectionListener;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.util.*;
 
@@ -35,6 +37,8 @@ public class MainForm extends JFrame {
 
     private final String FIRST_COMBOBOX_NAME = "firstDiskList";
     private final String SECOND_COMBOBOX_NAME = "secondDiskList";
+
+    private String[] arrPathToCopy;
 
     private void refreshTableGUI(JTable table, int index, Stack<DirInfo> dirInfoStack, boolean createFile){
 
@@ -76,40 +80,46 @@ public class MainForm extends JFrame {
                     secondTablePosition = index;
                 }
 
-                if(index > -1 && e.getKeyCode() == 10){
+                if(index > -1 && e.getKeyCode() == KeyEvent.VK_ENTER){
                     onEnter(index, dirInfoStack, table);
                 }
-                else if(e.getKeyCode() == 8){
+                else if(e.getKeyCode() == KeyEvent.VK_BACK_SPACE){
                     onBackspace(dirInfoStack, table);
                 }
-                else if(e.getKeyCode() == 127 || e.getKeyCode() == 119){
+                else if(e.getKeyCode() == KeyEvent.VK_DELETE || e.getKeyCode() == KeyEvent.VK_F10){
                     onDeleteFile(table);
                     refreshTableGUI(table, index, dirInfoStack, false);
                 }
-                else if(e.getKeyCode() == 118){
+                else if(e.getKeyCode() == KeyEvent.VK_F12){
                     //Создаю директорию
                     onCreateFile(dirInfoStack.peek().getDirectory().getAbsolutePath(), true);
                     refreshTableGUI(table, index, dirInfoStack, true);
                 }
-                else if( e.getKeyCode() == 117){
+                else if( e.getKeyCode() == KeyEvent.VK_F11){
 //                    Создаю файл
                     onCreateFile(dirInfoStack.peek().getDirectory().getAbsolutePath(), false);
                     refreshTableGUI(table, index, dirInfoStack, true);
                 }
-                else if (e.getKeyCode() == 9){
+                else if (e.getKeyCode() == KeyEvent.VK_TAB){
+                    onTab(table);
+                }
+                else if(e.isControlDown() && e.getKeyCode() == KeyEvent.VK_C){
+                    //Копирование сохранение данных выделенных файлов или папок
 
-                    table.clearSelection();
+                    arrPathToCopy = getArrFilePath(table, table.getSelectedRows());
+                }
+                else if(e.isControlDown() && e.getKeyCode() == KeyEvent.VK_V){
 
-                    if(table.getName().equals(FIRST_TABLE_NAME)){
-                        secondFileTable.grabFocus();
-                        table.clearSelection();
-                        secondFileTable.setRowSelectionInterval(secondTablePosition, secondTablePosition);
-                    }
-                    else {
-                        firstFileTable.grabFocus();
-                        table.getSelectionModel().clearSelection();
-                        firstFileTable.setRowSelectionInterval(firstTablePosition, firstTablePosition);
-                    }
+                    // с помощью cmd
+                    //                    try {
+//                        Runtime.getRuntime().exec("cmd.exe /C xcopy F:\\111 F:\\1111\\111 /s /e");
+//                    } catch (IOException e1) {
+//                        e1.printStackTrace();
+//                    }
+
+                    //с помощью java
+                    new CoppyDialog(arrPathToCopy, dirInfoStack.peek().getDirectory());
+                    //Вставка данных которые помечены для копирования
                 }
             }
         };
@@ -218,6 +228,20 @@ public class MainForm extends JFrame {
         table.getSelectedRow();
 
         new DeleteFileDialog(getArrFilePath(table, table.getSelectedRows()));
+    }
+
+    private void onTab(JTable table){
+
+        if(table.getName().equals(FIRST_TABLE_NAME)){
+            secondFileTable.grabFocus();
+            table.clearSelection();
+            secondFileTable.setRowSelectionInterval(secondTablePosition, secondTablePosition);
+        }
+        else {
+            firstFileTable.grabFocus();
+            table.getSelectionModel().clearSelection();
+            firstFileTable.setRowSelectionInterval(firstTablePosition, firstTablePosition);
+        }
     }
 
     private void onBackspace(Stack<DirInfo> filePath, JTable table){
