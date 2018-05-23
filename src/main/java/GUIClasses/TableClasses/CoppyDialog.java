@@ -79,37 +79,59 @@ public class CoppyDialog extends JDialog {
 
     private void copyDir(File curFile, File rootDir){
 
+        //Создаем папку которую копируем
         File newDir = new File(rootDir, curFile.getName());
 
+        if(!newDir.exists())
+            newDir.mkdir();
 
+//        Просматриваем файлы в директории откуда копируем
+        for (File childFile:curFile.listFiles()) {
+
+            if(childFile.isDirectory())
+                copyDir(childFile, newDir);
+            else {
+
+                File copyToFile = new File(newDir, childFile.getName());
+
+                if(!copyToFile.exists())
+                    copyFile(childFile, new File(newDir, childFile.getName()));
+                else
+                    copyFile(childFile, new File(newDir, childFile.getName() + " - Копия"));
+
+            }
+        }
     }
 
     private void copyFile(File fileForCopy, File copyToFile){
 
-        String copyDir = copyTo.getAbsolutePath();
-
         InputStream is = null;
         OutputStream os = null;
 
-//        try {
-//
-//            is = new FileInputStream(source);
-//            os = new FileOutputStream(new File(copyDir + "\\" + source.getName()));
-//
-//            byte[] buffer = new byte[1024];
-//            int length;
-//
-//            while ((length = is.read(buffer)) > 0) {
-//                os.write(buffer, 0, length);
-//            }
-//        } catch (FileNotFoundException e) {
-//            e.printStackTrace();
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        } finally {
-//            is.close();
-//            os.close();
-//        }
+        try {
+
+            is = new FileInputStream(fileForCopy);
+            os = new FileOutputStream(copyToFile);
+
+            byte[] buffer = new byte[1024];
+            int length;
+
+            while ((length = is.read(buffer)) > 0) {
+                os.write(buffer, 0, length);
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                is.close();
+                os.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+        }
 
     }
 
