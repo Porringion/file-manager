@@ -40,6 +40,8 @@ public class MainForm extends JFrame {
 
     private String[] arrPathToCopy;
 
+    private ApplicationState applicationState;
+
     private void refreshTableGUI(JTable table, int index, Stack<DirInfo> dirInfoStack, boolean createFile){
 
         table.setModel(new CustomTableModel(dirInfoStack.peek().getDirectory()));
@@ -119,7 +121,7 @@ public class MainForm extends JFrame {
 
                     //с помощью java
                     new CoppyDialog(arrPathToCopy, dirInfoStack.peek().getDirectory());
-                    //Вставка данных которые помечены для копирования
+                    refreshTableGUI(table, index, dirInfoStack, false);
                 }
             }
         };
@@ -132,18 +134,20 @@ public class MainForm extends JFrame {
                 JTable table;
                 Stack<DirInfo> dirInfoStack;
 
+                File fileDisk = (File) comboBox.getSelectedItem();
+
                 if(comboBox.getName().equals(FIRST_COMBOBOX_NAME)){
                     table = firstFileTable;
                     dirInfoStack = firstFilePath;
                     firstTablePosition = 0;
+                    applicationState.setFirstCurDisk(fileDisk);
                 }
                 else {
                     table = secondFileTable;
                     dirInfoStack = secondFilePath;
                     secondTablePosition = 0;
+                    applicationState.setSecondCurDisk(fileDisk);
                 }
-
-                File fileDisk = (File) comboBox.getSelectedItem();
 
                 if(fileDisk == null || !fileDisk.exists())
                     return;
@@ -208,15 +212,31 @@ public class MainForm extends JFrame {
 
     private MainForm() {
 
+        //инициилизируем события
         initListeners();
 
+        //инициилизируем настройки компонентов
         initComponentsSettings();
+
+        //сериализация
+        applicationState = ApplicationState.deserializeObject();
+
+        if(applicationState == null){
+            applicationState = new ApplicationState();
+            applicationState.setFirstCurDisk((File) firstDiskList.getSelectedItem());
+            applicationState.setSecondCurDisk((File) secondDiscList.getSelectedItem());
+        }
+        else{
+            firstDiskList.setSelectedItem(new File(applicationState.getFirstCurDisk()));
+            secondDiscList.setSelectedItem(new File(applicationState.getSecondCurDisk()));
+        }
+
 
         //Отображаю форму на панели
         setContentPane(mainFromPanel);
-        setVisible(true);
         pack();
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setVisible(true);
     }
 
     private void onCreateFile(String curDir, boolean isDir){

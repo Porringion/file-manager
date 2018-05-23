@@ -3,14 +3,20 @@ package GUIClasses.TableClasses;
 import javax.swing.*;
 import java.awt.event.*;
 import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
 
 public class CoppyDialog extends JDialog {
     private JPanel contentPane;
     private JButton buttonOK;
     private JButton buttonCancel;
-    private JProgressBar coppyProgressBar;
+    private JProgressBar copyProgressBar;
     private File copyTo;
     private String[] arrPath;
+    private int fileCount = 0;
+    private int curValue = 1;
 
     public CoppyDialog(String[] arrPath, File to) {
 
@@ -20,27 +26,12 @@ public class CoppyDialog extends JDialog {
         setContentPane(contentPane);
         setModal(true);
         pack();
-//        getRootPane().setDefaultButton(buttonOK);
-//
-//        buttonOK.addActionListener(new ActionListener() {
-//            public void actionPerformed(ActionEvent e) {
-//                onOK();
-//            }
-//        });
 
         buttonCancel.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 onCancel();
             }
         });
-
-        // call onCancel() when cross is clicked
-//        setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
-//        addWindowListener(new WindowAdapter() {
-//            public void windowClosing(WindowEvent e) {
-//                onCancel();
-//            }
-//        });
 
         // call onCancel() on ESCAPE
         contentPane.registerKeyboardAction(new ActionListener() {
@@ -49,15 +40,51 @@ public class CoppyDialog extends JDialog {
             }
         }, KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
 
-        startCopyTo();
+        int fileCount = getFileCount(convertArrPathToArrFile(arrPath));
+
+        copyProgressBar.setMinimum(0);
+        copyProgressBar.setMaximum(fileCount);
+
+        Thread thread = new Thread("copyThread") {
+            @Override
+            public void run() {
+                startCopyTo();
+            }
+        };
+        thread.start();
 
         setVisible(true);
     }
 
-//    private void onOK() {
-//        // add your code here
-//        dispose();
-//    }
+
+    private File[] convertArrPathToArrFile(String[] arrPath){
+
+        File[] listFile = new File[arrPath.length];
+        int counter = 0;
+
+        for (String path:arrPath) {
+            listFile[counter] = new File(path);
+            counter++;
+        }
+
+        return listFile;
+    }
+
+    private int getFileCount(File[] arrFile){
+
+        int count = 0;
+
+        for (File file:arrFile) {
+
+            if(!file.isDirectory())
+                count++;
+            else
+                count += getFileCount(file.listFiles());
+        }
+
+        return count;
+    }
+
 
     private void startCopyTo() {
 
@@ -66,7 +93,7 @@ public class CoppyDialog extends JDialog {
             File curFile = new File(path);
 
             if(!curFile.isDirectory()){
-                copyFile(curFile, copyTo);
+                copyFile(curFile, new File(copyTo, curFile.getName()));
                 continue;
             }
 
@@ -75,6 +102,7 @@ public class CoppyDialog extends JDialog {
             copyDir(curFile, rootDir);
         }
 
+        dispose();
     }
 
     private void copyDir(File curFile, File rootDir){
@@ -91,16 +119,13 @@ public class CoppyDialog extends JDialog {
             if(childFile.isDirectory())
                 copyDir(childFile, newDir);
             else {
-
-                File copyToFile = new File(newDir, childFile.getName());
-
-                if(!copyToFile.exists())
-                    copyFile(childFile, new File(newDir, childFile.getName()));
-                else
-                    copyFile(childFile, new File(newDir, childFile.getName() + " - Копия"));
-
+                copyFile(childFile, new File(newDir, childFile.getName()));
             }
         }
+    }
+
+    private void setProgress(int value){
+        copyProgressBar.setValue(value);
     }
 
     private void copyFile(File fileForCopy, File copyToFile){
@@ -119,6 +144,9 @@ public class CoppyDialog extends JDialog {
             while ((length = is.read(buffer)) > 0) {
                 os.write(buffer, 0, length);
             }
+
+            setProgress(curValue++);
+
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -130,9 +158,7 @@ public class CoppyDialog extends JDialog {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-
         }
-
     }
 
     private void onCancel() {
